@@ -10,27 +10,49 @@ export interface User {
 
 export function getUserByEmail(email: string): User | null {
   const normalizedEmail = email.trim().toLowerCase();
-  const row = db
-    .prepare('SELECT id, email, name, created_at as createdAt FROM users WHERE email = ?')
+
+  const row: any = db
+    .prepare(
+      'SELECT id, email, name, created_at as createdAt FROM users WHERE email = ?'
+    )
     .get(normalizedEmail);
+
   return row ?? null;
 }
 
 export function getUserById(id: string): User | null {
-  const row = db
-    .prepare('SELECT id, email, name, created_at as createdAt FROM users WHERE id = ?')
+  const row: any = db
+    .prepare(
+      'SELECT id, email, name, created_at as createdAt FROM users WHERE id = ?'
+    )
     .get(id);
+
   return row ?? null;
 }
 
-export function createUser(name: string, email: string, password: string): User {
+export function createUser(
+  name: string,
+  email: string,
+  password: string
+): User {
   const normalizedEmail = email.trim().toLowerCase();
   const passwordHash = bcrypt.hashSync(password, 10);
-  const id = `user_${Math.random().toString(36).slice(2, 12)}`;
+
+  const id = `user_${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+
   const createdAt = new Date().toISOString();
 
-  db.prepare('INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(id, normalizedEmail, name, passwordHash, createdAt);
+  db.prepare(
+    'INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(
+    id,
+    normalizedEmail,
+    name,
+    passwordHash,
+    createdAt
+  );
 
   return {
     id,
@@ -40,19 +62,35 @@ export function createUser(name: string, email: string, password: string): User 
   };
 }
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(
+  email: string,
+  password: string
+) {
   const normalizedEmail = email.trim().toLowerCase();
-  const result = db
-    .prepare('SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?')
+
+  const result: any = db
+    .prepare(
+      'SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?'
+    )
     .get(normalizedEmail);
 
   if (!result) {
-    return { success: false, error: 'Invalid credentials' };
+    return {
+      success: false,
+      error: 'Invalid credentials',
+    };
   }
 
-  const validPassword = bcrypt.compareSync(password, result.password_hash);
+  const validPassword = bcrypt.compareSync(
+    password,
+    result.password_hash
+  );
+
   if (!validPassword) {
-    return { success: false, error: 'Invalid credentials' };
+    return {
+      success: false,
+      error: 'Invalid credentials',
+    };
   }
 
   return {
@@ -66,14 +104,34 @@ export async function loginUser(email: string, password: string) {
   };
 }
 
-export async function signUpUser(name: string, email: string, password: string) {
+export async function signUpUser(
+  name: string,
+  email: string,
+  password: string
+) {
   const normalizedEmail = email.trim().toLowerCase();
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail);
+
+  const existing: any = db
+    .prepare(
+      'SELECT id FROM users WHERE email = ?'
+    )
+    .get(normalizedEmail);
 
   if (existing) {
-    return { success: false, error: 'Email already registered' };
+    return {
+      success: false,
+      error: 'Email already registered',
+    };
   }
 
-  const user = createUser(name, normalizedEmail, password);
-  return { success: true, user };
+  const user = createUser(
+    name,
+    normalizedEmail,
+    password
+  );
+
+  return {
+    success: true,
+    user,
+  };
 }
