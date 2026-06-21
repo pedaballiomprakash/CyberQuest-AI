@@ -3,155 +3,94 @@ import { getUserByEmail, createUser } from './auth';
 import { generateRoomCode } from './utils';
 
 export interface RoomRecord {
-id: string;
-code: string;
-hostId: string;
-createdAt: string;
+  id: string;
+  code: string;
+  hostId: string;
+  createdAt: string;
 }
 
 function normalizeEmail(email: string) {
-return email.trim().toLowerCase();
+  return email.trim().toLowerCase();
 }
 
 export async function getRoomByCode(
-roomCode: string
+  roomCode: string
 ): Promise<RoomRecord | null> {
-const { data, error } = await supabase
-.from('rooms')
-.select('*')
-.eq('code', roomCode.trim().toUpperCase())
-.maybeSingle();
+  const { data } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('code', roomCode.trim().toUpperCase())
+    .maybeSingle();
 
-console.log('getRoomByCode:', {
-data,
-error,
-});
+  if (!data) {
+    return null;
+  }
 
-if (!data) {
-return null;
-}
-
-return {
-id: data.id,
-code: data.code,
-hostId: data.host_id,
-createdAt: data.created_at,
-};
+  return {
+    id: data.id,
+    code: data.code,
+    hostId: data.host_id,
+    createdAt: data.created_at,
+  };
 }
 
 export async function createRoom(
-hostUserId?: string,
-hostEmail?: string
+  hostUserId?: string,
+  hostEmail?: string
 ): Promise<RoomRecord> {
-console.log('START createRoom');
-console.log(
-'hostUserId:',
-hostUserId
-);
-console.log(
-'generateRoomCode type:',
-typeof generateRoomCode
-);
+  let userId = hostUserId;
 
-let userId = hostUserId;
+  if (!userId) {
+    const email = hostEmail
+      ? normalizeEmail(hostEmail)
+      : `guest+${Math.random().toString(36).slice(2, 8)}@cyberquest.ai`;
 
-if (!userId) {
-const email = hostEmail
-? normalizeEmail(hostEmail)
-: `guest+${Math.random()
-          .toString(36)
-          .slice(2, 8)}@cyberquest.ai`;
+    let user = await getUserByEmail(email);
 
-```
-console.log(
-  'guest email:',
-  email
-);
+    if (!user) {
+      const password = Math.random()
+        .toString(36)
+        .slice(2, 12);
 
-let user =
-  await getUserByEmail(email);
+      user = await createUser('Guest', email, password);
+    }
 
-if (!user) {
-  const password = Math.random()
-    .toString(36)
-    .slice(2, 12);
+    userId = user.id;
+  }
 
-  user = await createUser(
-    'Guest',
-    email,
-    password
-  );
-}
+  let code = generateRoomCode();
 
-userId = user.id;
-```
+  while (true) {
+    const { data } = await supabase
+      .from('rooms')
+      .select('id')
+      .eq('code', code)
+      .maybeSingle();
 
-}
+    if (!data) {
+      break;
+    }
 
-console.log(
-'calling generateRoomCode'
-);
+    code = generateRoomCode();
+  }
 
-let code = generateRoomCode();
+  const { data, error } = await supabase
+    .from('rooms')
+    .insert({
+      code,
+      host_id: userId,
+    })
+    .select()
+    .single();
 
-console.log(
-'generated code:',
-code
-);
+  if (error) {
+    throw error;
+  }
 
-while (true) {
-const result =
-await supabase
-.from('rooms')
-.select('id')
-.eq('code', code)
-.maybeSingle();
-
-```
-console.log(
-  'room lookup:',
-  result
-);
-
-if (!result.data) {
-  break;
-}
-
-code = generateRoomCode();
-```
-
-}
-
-console.log(
-'inserting room...'
-);
-
-const { data, error } =
-await supabase
-.from('rooms')
-.insert({
-code,
-host_id: userId,
-})
-.select()
-.single();
-
-console.log(
-'insert result:',
-{
-data,
-error,
-}
-);
-
-if (error) {
-throw error;
-}
-
-return {
-id: data.id,
-code: data.code,
-hostId: data.host_id,
-createdAt: data.created_at,
-};
+  return {
+    id: data.id,
+    code: data.code,
+    hostId: data.host_id,
+    createdAt: data.created_at,
+  };
 }
