@@ -1,3 +1,14 @@
-export const supabase = {
-  // Placeholder Supabase client implementation.
-};
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
+
+console.log(
+  'SUPABASE FROM TYPE:',
+  typeof supabase.from
+);

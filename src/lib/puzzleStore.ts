@@ -1,102 +1,85 @@
-import db from './db';
+import { supabase } from './supabase';
 
 export interface StoredPuzzle {
-  roomCode: string;
-  question: string;
-  hint: string;
-  answer: string;
-  createdAt: string;
+roomCode: string;
+question: string;
+hint: string;
+answer: string;
+createdAt: string;
 }
 
-export function savePuzzle(
-  roomCode: string,
-  puzzle: Omit<StoredPuzzle, 'roomCode'>
+export async function savePuzzle(
+roomCode: string,
+puzzle: Omit<StoredPuzzle, 'roomCode'>
 ) {
-  const room: any = db
-    .prepare('SELECT id FROM rooms WHERE code = ?')
-    .get(roomCode.trim().toUpperCase());
+await supabase
+.from('puzzles')
+.delete()
+.eq(
+'room_code',
+roomCode.trim().toUpperCase()
+);
 
-  if (!room) {
-    return null;
-  }
+const { error } = await supabase
+.from('puzzles')
+.insert({
+room_code:
+roomCode.trim().toUpperCase(),
+question: puzzle.question,
+answer: puzzle.answer,
+hint: puzzle.hint,
+created_at: puzzle.createdAt,
+});
 
-  const roomId = room.id;
-
-  const existing: any = db
-    .prepare('SELECT id FROM puzzles WHERE room_id = ?')
-    .get(roomId);
-
-  if (existing) {
-    db.prepare(
-      'DELETE FROM puzzles WHERE room_id = ?'
-    ).run(roomId);
-  }
-
-  const id = `puzzle_${Math.random()
-    .toString(36)
-    .slice(2, 12)}`;
-
-  db.prepare(
-    `INSERT INTO puzzles
-    (id, room_id, question, answer, hint, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    roomId,
-    puzzle.question,
-    puzzle.answer,
-    puzzle.hint,
-    puzzle.createdAt
-  );
-
-  return {
-    roomCode: roomCode.trim().toUpperCase(),
-    ...puzzle,
-  };
+if (error) {
+throw error;
 }
 
-export function getPuzzle(
-  roomCode: string
-): StoredPuzzle | null {
-  const row: any = db
-    .prepare(
-      `SELECT
-        p.question,
-        p.hint,
-        p.answer,
-        p.created_at AS createdAt
-      FROM puzzles p
-      JOIN rooms r
-        ON p.room_id = r.id
-      WHERE r.code = ?
-      ORDER BY p.created_at DESC
-      LIMIT 1`
-    )
-    .get(roomCode.trim().toUpperCase());
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    roomCode: roomCode.trim().toUpperCase(),
-    question: row.question,
-    hint: row.hint,
-    answer: row.answer,
-    createdAt: row.createdAt,
-  };
+return {
+roomCode:
+roomCode.trim().toUpperCase(),
+...puzzle,
+};
 }
 
-export function clearPuzzle(roomCode: string) {
-  const room: any = db
-    .prepare('SELECT id FROM rooms WHERE code = ?')
-    .get(roomCode.trim().toUpperCase());
+export async function getPuzzle(
+roomCode: string
+): Promise<StoredPuzzle | null> {
+const { data } = await supabase
+.from('puzzles')
+.select('*')
+.eq(
+'room_code',
+roomCode.trim().toUpperCase()
+)
+.order('created_at', {
+ascending: false,
+})
+.limit(1)
+.single();
 
-  if (!room) {
-    return;
-  }
+if (!data) {
+return null;
+}
 
-  db.prepare(
-    'DELETE FROM puzzles WHERE room_id = ?'
-  ).run(room.id);
+return {
+roomCode:
+roomCode.trim().toUpperCase(),
+question: data.question,
+hint: data.hint,
+answer: data.answer,
+createdAt: data.created_at,
+};
+}
+
+export async function clearPuzzle(
+roomCode: string
+) {
+await supabase
+.from('puzzles')
+.delete()
+.eq(
+'room_code',
+roomCode.trim().toUpperCase()
+);
 }

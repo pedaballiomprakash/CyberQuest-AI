@@ -1,98 +1,113 @@
-import db from './db';
+import { supabase } from './supabase';
 
 export interface SessionRecord {
-  sessionId: string;
-  userId: string;
-  createdAt: string;
+sessionId: string;
+userId: string;
+createdAt: string;
 }
 
-export function createSession(
-  userId: string
-): SessionRecord {
-  const sessionId = `sess_${Math.random()
+export async function createSession(
+userId: string
+): Promise<SessionRecord> {
+const sessionId = `sess_${Math.random()
     .toString(36)
     .slice(2, 18)}`;
 
-  const createdAt = new Date().toISOString();
+const createdAt = new Date().toISOString();
 
-  db.prepare(
-    'INSERT INTO sessions (session_id, user_id, created_at) VALUES (?, ?, ?)'
-  ).run(
-    sessionId,
-    userId,
-    createdAt
-  );
+const { error } = await supabase
+.from('sessions')
+.insert({
+session_id: sessionId,
+user_id: userId,
+created_at: createdAt,
+});
 
-  return {
-    sessionId,
-    userId,
-    createdAt,
-  };
+if (error) {
+throw error;
 }
 
-export function getSession(
-  sessionId: string
-): SessionRecord | null {
-  const row: any = db
-    .prepare(
-      'SELECT session_id as sessionId, user_id as userId, created_at as createdAt FROM sessions WHERE session_id = ?'
-    )
-    .get(sessionId);
-
-  return row ?? null;
+return {
+sessionId,
+userId,
+createdAt,
+};
 }
 
-export function deleteSession(
-  sessionId: string
+export async function getSession(
+sessionId: string
+): Promise<SessionRecord | null> {
+const { data } = await supabase
+.from('sessions')
+.select('*')
+.eq('session_id', sessionId)
+.single();
+
+if (!data) {
+return null;
+}
+
+return {
+sessionId: data.session_id,
+userId: data.user_id,
+createdAt: data.created_at,
+};
+}
+
+export async function deleteSession(
+sessionId: string
 ) {
-  db.prepare(
-    'DELETE FROM sessions WHERE session_id = ?'
-  ).run(sessionId);
+await supabase
+.from('sessions')
+.delete()
+.eq('session_id', sessionId);
 }
 
 export function getSessionIdFromCookieHeader(
-  cookieHeader: string | null
+cookieHeader: string | null
 ): string | null {
-  const header = cookieHeader ?? '';
+const header = cookieHeader ?? '';
 
-  const match = header.match(
-    /(?:^|; )sessionId=([^;]+)/
-  );
+const match = header.match(
+/(?:^|; )sessionId=([^;]+)/
+);
 
-  return match?.[1] ?? null;
+return match?.[1] ?? null;
 }
 
 export function getSessionIdFromRequest(
-  req: Request
+req: Request
 ): string | null {
-  return getSessionIdFromCookieHeader(
-    req.headers.get('cookie')
-  );
+return getSessionIdFromCookieHeader(
+req.headers.get('cookie')
+);
 }
 
-export function getUserIdFromRequest(
-  req: Request
-): string | null {
-  const sessionId =
-    getSessionIdFromRequest(req);
+export async function getUserIdFromRequest(
+req: Request
+): Promise<string | null> {
+const sessionId =
+getSessionIdFromRequest(req);
 
-  if (!sessionId) {
-    return null;
-  }
-
-  const session = getSession(sessionId);
-
-  return session?.userId ?? null;
+if (!sessionId) {
+return null;
 }
 
-export function getUserIdFromCookieValue(
-  sessionId: string | null
-): string | null {
-  if (!sessionId) {
-    return null;
-  }
+const session =
+await getSession(sessionId);
 
-  const session = getSession(sessionId);
+return session?.userId ?? null;
+}
 
-  return session?.userId ?? null;
+export async function getUserIdFromCookieValue(
+sessionId: string | null
+): Promise<string | null> {
+if (!sessionId) {
+return null;
+}
+
+const session =
+await getSession(sessionId);
+
+return session?.userId ?? null;
 }
